@@ -244,41 +244,59 @@
         // --- PASTE YOUR WEB APP URL HERE ---
         const AUTOMATED_DATA_URL = "https://script.google.com/macros/s/AKfycbyvhQvFANmpDZxw15G0KstQT7UGcBiNRbI-GGzxV55ruxYZJzUqa_n9I7fz75uIscmn/exec"; 
 
-        async function initSync() {
-            if (!AUTOMATED_DATA_URL) return;
+async function initSync() {
+    if (!AUTOMATED_DATA_URL) return;
+    
+    const loader = document.getElementById('loader');
+    loader.classList.remove('hidden');
+    
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        
+        // UPDATED: Added method, mode, and redirect options
+        const response = await fetch(AUTOMATED_DATA_URL, { 
+            method: 'GET',
+            mode: 'cors',      // Required for cross-origin requests
+            redirect: 'follow', // Crucial for Google Apps Script redirects
+            signal: controller.signal 
+        });
+        
+        clearTimeout(timeoutId);
+
+        // Check if the response is actually OK before parsing JSON
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const data = await response.json();
+        
+        if (data.daily && data.warnings) {
+            dailyData = data.daily;
+            warnData = data.warnings;
             
-            const loader = document.getElementById('loader');
-            loader.classList.remove('hidden');
-            
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-                
-                const response = await fetch(AUTOMATED_DATA_URL, { signal: controller.signal });
-                clearTimeout(timeoutId);
-                
-                const data = await response.json();
-                
-                if (data.daily && data.warnings) {
-                    dailyData = data.daily;
-                    warnData = data.warnings;
-                    
-                    if (data.lastUpdated) {
-                        document.getElementById('last-updated').innerText = `LAST SYNC: ${new Date(data.lastUpdated).toLocaleString()}`;
-                    }
-                    
-                    document.getElementById('sync-indicator').classList.remove('hidden');
-                    showDashboard();
-                } else {
-                    throw new Error("Invalid data format");
-                }
-            } catch (e) {
-                console.error("Sync Error:", e);
-                document.getElementById('sync-error').classList.remove('hidden');
-            } finally {
-                loader.classList.add('hidden');
+            if (data.lastUpdated) {
+                document.getElementById('last-updated').innerText = `LAST SYNC: ${new Date(data.lastUpdated).toLocaleString()}`;
             }
+            
+            document.getElementById('sync-indicator').classList.remove('hidden');
+            showDashboard();
+        } else if (data.error) {
+            // This catches the error message sent by the Apps Script if tabs aren't found
+            throw new Error(data.error);
+        } else {
+            throw new Error("Invalid data format received from script.");
         }
+    } catch (e) {
+        console.error("Sync Error:", e);
+        // Show the error message to the user so they know why it failed
+        const syncError = document.getElementById('sync-error');
+        if (syncError) {
+            syncError.classList.remove('hidden');
+            syncError.innerText = `Sync Error: ${e.message}`;
+        }
+    } finally {
+        loader.classList.add('hidden');
+    }
+}
 
         window.onload = initSync;
 
