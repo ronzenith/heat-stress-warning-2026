@@ -80,18 +80,15 @@
 </head>
 <body>
 
-    <!-- Loading Overlay -->
     <div id="loader">
         <div class="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p class="text-amber-500 font-bold animate-pulse text-sm">Syncing Live Data...</p>
     </div>
 
-    <!-- Hover Tooltip -->
     <div id="chart-tooltip"></div>
 
     <div class="max-w-[1400px] mx-auto p-6 space-y-6">
         
-        <!-- Header -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h1 class="text-3xl font-black text-white flex items-center gap-3">
@@ -107,7 +104,6 @@
             </div>
         </div>
 
-        <!-- Key Stats Cards -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="card border-amber-500/40 bg-amber-500/5">
                 <p class="text-[10px] text-amber-400 uppercase font-black tracking-widest mb-1">Warning Events</p>
@@ -127,7 +123,6 @@
             </div>
         </div>
 
-        <!-- Heatmap Distribution -->
         <div class="card overflow-">
             <h3 class="text-xs font-bold uppercase text-gray-500 mb-4 tracking-tighter">Annual Intensity Distribution</h3>
             <div class="overflow-x-auto pb-4">
@@ -141,7 +136,6 @@
             </div>
         </div>
 
-        <!-- Charts Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="card">
                 <div class="h-80"><canvas id="lineChart"></canvas></div>
