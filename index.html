@@ -155,172 +155,53 @@
     </div>
 
     <script>
-        // Replace this with your new Web App URL from Step 2
-const API_URL = "https://script.google.com/macros/s/AKfycbxoJBOXtY9GDeEOQzNZxtE5f6oa55V8E3SiNY_jroAsVD-pU8Jr1ByTrOMh5twuUd3k/exec";
+        // 1. Paste your Google Web App URL here
+const API_URL = "https://script.google.com/macros/s/AKfycbxsCoBXwGpEOjiAN0LeYMlDoVSFd-efTO2DGfCfXBeIBYwYuMZ_GLlviQOzaZDhr5QG/exec"; 
+
+let dailyData = [];
+let warnData = [];
+let charts = {};
+
+// This is the "missing tool" that caused your error
+function formatApiData(rawRows) {
+    if (!rawRows || rawRows.length < 2) return [];
+    const headers = rawRows[0];
+    return rawRows.slice(1).map(row => {
+        const obj = {};
+        headers.forEach((h, i) => {
+            let v = row[i];
+            obj[h] = (v !== "" && !isNaN(v) && v !== null) ? Number(v) : v;
+        });
+        return obj;
+    });
+}
 
 async function initSync() {
     try {
         const response = await fetch(API_URL);
-        const data = await response.json(); // The API sends clean data immediately
+        const data = await response.json();
         
-        // This maps the API data to your dashboard
+        // Use the tool to clean the data
         dailyData = formatApiData(data.daily);
         warnData = formatApiData(data.warnings);
-        
-        updateUI();
-        document.getElementById('loader').classList.add('hidden');
+
+        if (dailyData.length > 0) {
+            setupYearFilter();
+            updateUI();
+            document.getElementById('sync-indicator')?.classList.remove('hidden');
+            const lastUpdatedEl = document.getElementById('last-updated');
+            if (lastUpdatedEl) lastUpdatedEl.innerText = `SYNCED: ${new Date().toLocaleTimeString()}`;
+        }
     } catch (e) {
         console.error("API Sync Error:", e);
+        alert("Connection failed. Check if your Google App Script is deployed to 'Anyone'.");
+    } finally {
+        document.getElementById('loader').classList.add('hidden');
     }
 }
-        function parseCSV(text) {
-            const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
-            if (lines.length < 2) return [];
-            const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-            return lines.slice(1).map(line => {
-                const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                const obj = {};
-                headers.forEach((h, i) => {
-                    let v = (values[i] || "").trim().replace(/^"|"$/g, '');
-                    obj[h] = (v !== "" && !isNaN(v)) ? Number(v) : v;
-                });
-                return obj;
-            });
-        }
 
-        function setupYearFilter() {
-            const years = [...new Set(dailyData.map(d => d['Season Year']))].filter(y => y).sort((a,b) => b-a);
-            const select = document.getElementById('year-filter');
-            years.forEach(y => {
-                const opt = document.createElement('option');
-                opt.value = y; opt.innerText = y;
-                select.appendChild(opt);
-            });
-        }
-
-        function updateUI() {
-            const year = Number(document.getElementById('year-filter').value);
-            const filteredDaily = dailyData.filter(d => d['Season Year'] === year);
-            const filteredWarns = warnData.filter(w => {
-                // Filter warnings that start in the selected year
-                return new Date(w['Start Date']).getFullYear() === year;
-            });
-
-            renderStats(filteredDaily, filteredWarns);
-            renderHeatmap(filteredDaily);
-            renderCharts(filteredDaily, filteredWarns, year);
-        }
-
-        function renderStats(daily, warns) {
-            document.getElementById('stat-total-events').innerText = warns.length;
-            document.getElementById('stat-red-count').innerText = warns.filter(w => w.Color === 'Red').length;
-            const max = Math.max(...daily.map(d => d['Warning Hours'] || 0));
-            document.getElementById('stat-max-hours').innerText = max.toFixed(1) + 'h';
-            document.getElementById('stat-warn-days').innerText = daily.filter(d => d['Warning Hours'] > 0).length;
-        }
-
-        function renderHeatmap(data) {
-            const el = document.getElementById('heatmap');
-            el.innerHTML = '';
-            
-            data.forEach(d => {
-                const node = document.createElement('div');
-                node.className = 'day-node';
-                const h = d['Warning Hours'] || 0;
-                
-                if (h > 0) {
-                    if (d['Worst Color'] === 'Red') node.style.background = 'var(--red)';
-                    else if (h > 4) node.style.background = 'var(--amber)';
-                    else node.style.background = '#3e2c00';
-                }
-
-                node.onmouseenter = (e) => {
-                    const t = document.getElementById('chart-tooltip');
-                    t.style.display = 'block';
-                    t.style.left = (e.pageX + 10) + 'px';
-                    t.style.top = (e.pageY - 20) + 'px';
-                    t.innerHTML = `<strong>${d['Month Name']} ${d.Day}</strong><br>${h.toFixed(2)} Hours Warning`;
-                };
-                node.onmouseleave = () => document.getElementById('chart-tooltip').style.display = 'none';
-                
-                el.appendChild(node);
-            });
-        }
-
-        function renderCharts(daily, warns, year) {
-            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            const monthlyHours = months.map(m => {
-                return daily.filter(d => d['Month Name'] === m).reduce((sum, d) => sum + (d['Warning Hours'] || 0), 0);
-            });
-
-            // Line Chart
-            const ctx1 = document.getElementById('lineChart').getContext('2d');
-            if (charts.line) charts.line.destroy();
-            charts.line = new Chart(ctx1, {
-                type: 'line',
-                data: {
-                    labels: months,
-                    datasets: [{
-                        label: 'Total Warning Hours',
-                        data: monthlyHours,
-                        borderColor: '#d29922',
-                        backgroundColor: '#d2992220',
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: { 
-                    maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { display: false },
-                        title: { display: true, text: `Monthly Warning Accumulation (${year})`, color: '#fff' }
-                    },
-                    scales: {
-                        y: { grid: { color: '#ffffff10' }, ticks: { color: '#8b949e' } },
-                        x: { grid: { display: false }, ticks: { color: '#8b949e' } }
-                    }
-                }
-            });
-
-            // Bar Chart (Duration Histogram)
-            const ctx2 = document.getElementById('barChart').getContext('2d');
-            if (charts.bar) charts.bar.destroy();
-            const ranges = ['0-2h', '2-4h', '4-6h', '6h+'];
-            const histData = [0, 0, 0, 0];
-            warns.forEach(w => {
-                const dur = w['Duration (hours)'];
-                if (dur <= 2) histData[0]++;
-                else if (dur <= 4) histData[1]++;
-                else if (dur <= 6) histData[2]++;
-                else histData[3]++;
-            });
-
-            charts.bar = new Chart(ctx2, {
-                type: 'bar',
-                data: {
-                    labels: ranges,
-                    datasets: [{
-                        data: histData,
-                        backgroundColor: '#f8514980',
-                        borderColor: '#f85149',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { display: false },
-                        title: { display: true, text: 'Warning Duration Frequency', color: '#fff' }
-                    },
-                    scales: {
-                        y: { grid: { color: '#ffffff10' }, ticks: { color: '#8b949e', stepSize: 1 } },
-                        x: { grid: { display: false }, ticks: { color: '#8b949e' } }
-                    }
-                }
-            });
-        }
-
-        window.onload = initSync;
+// Keep your existing setupYearFilter, updateUI, renderStats, etc. below this line...
+window.onload = initSync;
     </script>
 </body>
 </html>
