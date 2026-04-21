@@ -155,43 +155,24 @@
     </div>
 
     <script>
-        // NEW DIRECT PUBLISHED LINKS HERE
-        const CSV_URL_DAILY = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRkdiq2o4KgUe4pfbGAzPCmhsIuj-f6mpZvxw1abeY2eMX4tWYUz4dYwkTbtt5thg965E9GvEx3EYzC/pub?gid=423769551&single=true&output=csv";
-        const CSV_URL_WARNS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRkdiq2o4KgUe4pfbGAzPCmhsIuj-f6mpZvxw1abeY2eMX4tWYUz4dYwkTbtt5thg965E9GvEx3EYzC/pub?gid=20760700&single=true&output=csv";
+        // Replace this with your new Web App URL from Step 2
+const API_URL = "https://script.google.com/macros/s/XXXXX/exec";
 
-        let dailyData = [];
-        let warnData = [];
-        let charts = {};
-
-        async function initSync() {
-            try {
-                const [resD, resW] = await Promise.all([
-                    fetch(CSV_URL_DAILY),
-                    fetch(CSV_URL_WARNS)
-                ]);
-
-                if (!resD.ok || !resW.ok) throw new Error("Google Sheets Access Denied");
-
-                const textD = await resD.text();
-                const textW = await resW.text();
-
-                dailyData = parseCSV(textD);
-                warnData = parseCSV(textW);
-
-                if (dailyData.length > 0) {
-                    setupYearFilter();
-                    updateUI();
-                    document.getElementById('sync-indicator').classList.remove('hidden');
-                    document.getElementById('last-updated').innerText = `SYNCED: ${new Date().toLocaleTimeString()}`;
-                }
-            } catch (e) {
-                console.error("Sync Error:", e);
-                alert("Dashboard could not connect to Google Sheets. Check sharing settings.");
-            } finally {
-                document.getElementById('loader').classList.add('hidden');
-            }
-        }
-
+async function initSync() {
+    try {
+        const response = await fetch(API_URL);
+        const data = await response.json(); // The API sends clean data immediately
+        
+        // This maps the API data to your dashboard
+        dailyData = formatApiData(data.daily);
+        warnData = formatApiData(data.warnings);
+        
+        updateUI();
+        document.getElementById('loader').classList.add('hidden');
+    } catch (e) {
+        console.error("API Sync Error:", e);
+    }
+}
         function parseCSV(text) {
             const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
             if (lines.length < 2) return [];
