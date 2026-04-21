@@ -192,7 +192,7 @@
                 if (dailyData.length > 0) {
                     setupYearFilter();
                     updateUI();
-                    document.getElementById('sync-indicator').classList.remove('!hidden');
+                    document.getElementById('sync-indicator').classList.remove('hidden');
                     document.getElementById('last-updated').innerText = `SYNCED: ${new Date().toLocaleTimeString()}`;
                 }
             } catch (e) {
@@ -207,7 +207,7 @@
                 `;
             } finally {
                 const loader = document.getElementById('loader');
-                if (loader.querySelector('.animate-spin')) loader.classList.add('hidden');
+                if (loader.querySelector('.animate-spin')) loader.classList.add('!hidden');
             }
         }
 
