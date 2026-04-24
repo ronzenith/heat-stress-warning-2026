@@ -8,13 +8,14 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg: #0d1117;
-            --card: #161b22;
-            --border: #30363d;
-            --text: #c9d1d9;
+            --bg: #ffffff;
+            --card: #ffffff;
+            --border: #e1e4e8;
+            --text: #24292e;
             --amber: #d29922;
-            --red: #f85149;
-            --empty: #21262d;
+            --red: #d73a49;
+            --black: #000000;
+            --empty: #ebedf0;
         }
 
         body {
@@ -30,10 +31,12 @@
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
         .heatmap-container {
             display: inline-grid;
+            /* 7 rows for a week: Vertical flow Jan 1, Jan 2... */
             grid-template-rows: repeat(7, 14px);
             grid-auto-flow: column;
             gap: 4px;
@@ -49,32 +52,42 @@
 
         .day-node:hover {
             transform: scale(1.4);
-            outline: 1px solid white;
+            outline: 1px solid #0366d6;
             z-index: 50;
         }
 
         #chart-tooltip {
             position: fixed;
             display: none;
-            background: rgba(0,0,0,0.9);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.95);
+            color: #24292e;
             padding: 8px 12px;
             border-radius: 6px;
             font-size: 11px;
             z-index: 1000;
             border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             pointer-events: none;
         }
 
         #loader {
             position: fixed;
             inset: 0;
-            background: var(--bg);
+            background: white;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 2000;
+        }
+
+        .month-labels {
+            display: flex;
+            font-size: 10px;
+            color: #6a737d;
+            margin-bottom: 6px;
+            user-select: none;
+            height: 14px;
         }
     </style>
 </head>
@@ -82,7 +95,7 @@
 
     <div id="loader">
         <div class="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p class="text-amber-500 font-bold animate-pulse text-sm">Syncing Live Data...</p>
+        <p class="text-amber-600 font-bold animate-pulse text-sm">Syncing Live Data...</p>
     </div>
 
     <div id="chart-tooltip"></div>
@@ -91,48 +104,52 @@
         
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-                <h1 class="text-3xl font-black text-white flex items-center gap-3">
+                <h1 class="text-3xl font-black text-gray-900 flex items-center gap-3">
                     Heat Stress Analytics
-                    <span id="sync-indicator" class=" px-2 py-0.5 bg-green-600/20 text-green-500 border border-green-500/40 text-[10px] rounded font-black uppercase">Live Sync</span>
+                    <span id="sync-indicator" class="px-2 py-0.5 bg-blue-100 text-blue-700 border border-blue-200 text-[10px] rounded font-black uppercase whitespace-nowrap">Nightly Updated at 23:30 HKT</span>
                 </h1>
-                <p class="text-gray-400 text-sm">Automated monitoring via Google Sheets API</p>
+                <p class="text-gray-500 text-sm font-medium">Automated monitoring via Google Sheets API</p>
             </div>
             <div class="flex items-center gap-3">
-                <select id="year-filter" onchange="updateUI()" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-4 py-2 focus:ring-amber-500 focus:border-amber-500">
+                <select id="year-filter" onchange="updateUI()" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-4 py-2 focus:ring-amber-500 focus:border-amber-500 outline-none shadow-sm">
                 </select>
-                <div id="last-updated" class="text-[10px] text-gray-500 font-mono bg-gray-800/50 px-3 py-2 rounded-lg border border-gray-700"></div>
+                <div id="last-updated" class="text-[10px] text-gray-500 font-mono bg-gray-100 px-3 py-2 rounded-lg border border-gray-200"></div>
             </div>
         </div>
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="card border-amber-500/40 bg-amber-500/5">
-                <p class="text-[10px] text-amber-400 uppercase font-black tracking-widest mb-1">Warning Events</p>
-                <p id="stat-total-events" class="text-4xl font-black text-amber-500">—</p>
+            <div class="card border-amber-200 bg-amber-50/50">
+                <p class="text-[10px] text-amber-700 uppercase font-black tracking-widest mb-1">Warning Episodes</p>
+                <p id="stat-total-episodes" class="text-4xl font-black text-amber-600">—</p>
             </div>
-            <div class="card border-red-500/40 bg-red-500/5">
-                <p class="text-[10px] text-red-400 uppercase font-black tracking-widest mb-1">Red Alerts</p>
-                <p id="stat-red-count" class="text-4xl font-black text-red-500">—</p>
+            <div class="card bg-gray-50/30">
+                <p class="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Warning Days</p>
+                <p id="stat-warn-days" class="text-4xl font-black text-gray-900">—</p>
             </div>
-            <div class="card">
-                <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-1">Max Duration (24h)</p>
-                <p id="stat-max-hours" class="text-4xl font-black text-white">—</p>
+            <div class="card border-red-200 bg-red-50/50">
+                <p class="text-[10px] text-red-700 uppercase font-black tracking-widest mb-1">Red Alerts</p>
+                <p id="stat-red-count" class="text-4xl font-black text-red-600">—</p>
             </div>
-            <div class="card">
-                <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-1">Warning Days</p>
-                <p id="stat-warn-days" class="text-4xl font-black text-white">—</p>
+            <div class="card bg-gray-50/30">
+                <p class="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Max Duration (hrs)</p>
+                <p id="stat-max-hours" class="text-4xl font-black text-gray-900">—</p>
             </div>
         </div>
 
-        <div class="card overflow-">
-            <h3 class="text-xs font-bold uppercase text-gray-500 mb-4 tracking-tighter">Annual Intensity Distribution</h3>
-            <div class="overflow-x-auto pb-4">
-                <div id="heatmap" class="heatmap-container"></div>
+        <!-- Center aligned Heatmap Card -->
+        <div class="card">
+            <h3 class="text-xs font-bold uppercase text-gray-400 mb-4 tracking-tighter text-center">Annual Intensity Distribution</h3>
+            <div class="overflow-x-auto pb-4 flex justify-center">
+                <div class="inline-block min-w-max">
+                    <div id="month-labels-container" class="month-labels"></div>
+                    <div id="heatmap" class="heatmap-container"></div>
+                </div>
             </div>
-            <div class="flex gap-4 mt-2 text-[10px] text-gray-500">
-                <div class="flex items-center gap-1"><div class="w-2 h-2 bg-[#21262d] rounded-sm"></div> Clear</div>
-                <div class="flex items-center gap-1"><div class="w-2 h-2 bg-[#3e2c00] rounded-sm"></div> Low Warning</div>
+            <div class="flex justify-center gap-4 mt-2 text-[10px] text-gray-500">
+                <div class="flex items-center gap-1"><div class="w-2 h-2 bg-[#ebedf0] rounded-sm"></div> Clear</div>
                 <div class="flex items-center gap-1"><div class="w-2 h-2 bg-[#d29922] rounded-sm"></div> Amber</div>
-                <div class="flex items-center gap-1"><div class="w-2 h-2 bg-[#f85149] rounded-sm"></div> Red</div>
+                <div class="flex items-center gap-1"><div class="w-2 h-2 bg-[#d73a49] rounded-sm"></div> Red</div>
+                <div class="flex items-center gap-1"><div class="w-2 h-2 bg-[#000000] rounded-sm"></div> Black</div>
             </div>
         </div>
 
@@ -148,16 +165,12 @@
     </div>
 
     <script>
-        /** * SETUP: Replace the string below with your Web App URL 
-         * from Google Apps Script (Extensions > Apps Script > Deploy)
-         */
         const API_URL = "https://script.google.com/macros/s/AKfycbwrcfD8rdmfM41Ct1QzRWirg5iW0IZaI3NF8yb863GYkGDGN0BvFBdXDQ63V07LOvUA/exec";
 
         let dailyData = [];
         let warnData = [];
         let charts = {};
 
-        // 1. Data Cleaning Tool: Converts raw API grid into useful objects
         function formatApiData(rawRows) {
             if (!rawRows || rawRows.length < 2) return [];
             const headers = rawRows[0];
@@ -165,14 +178,12 @@
                 const obj = {};
                 headers.forEach((h, i) => {
                     let v = row[i];
-                    // Clean data: convert numbers, handle empty strings
                     obj[h] = (v !== "" && !isNaN(v) && v !== null) ? Number(v) : v;
                 });
                 return obj;
             });
         }
 
-        // 2. Fetch Data from Google API
         async function initSync() {
             try {
                 const response = await fetch(API_URL);
@@ -187,16 +198,21 @@
                     setupYearFilter();
                     updateUI();
                     document.getElementById('sync-indicator').classList.remove('hidden');
-                    document.getElementById('last-updated').innerText = `SYNCED: ${new Date().toLocaleTimeString()}`;
+                    const timestamp = new Date().toLocaleTimeString('en-GB', { 
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        second: '2-digit',
+                        hour12: false 
+                    });
+                    document.getElementById('last-updated').innerText = `SYNCED: ${timestamp}`;
                 }
             } catch (e) {
                 console.error("Sync Failure:", e);
-                // Create a visible error message if sync fails
                 document.getElementById('loader').innerHTML = `
                     <div class="text-red-500 p-8 text-center">
                         <p class="font-bold">Sync Error</p>
                         <p class="text-xs opacity-70 mt-2">${e.message}</p>
-                        <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-gray-800 rounded">Retry</button>
+                        <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-gray-100 border border-gray-200 rounded">Retry</button>
                     </div>
                 `;
             } finally {
@@ -205,14 +221,20 @@
             }
         }
 
-        // 3. UI logic: Updates everything based on selected year
         function setupYearFilter() {
-            const years = [...new Set(dailyData.map(d => d['Season Year']))].filter(y => y).sort((a,b) => b-a);
+            const rawYears = [...new Set(dailyData.map(d => d['Season Year']))].filter(y => y);
+            if (!rawYears.includes(2026)) rawYears.push(2026);
+            if (!rawYears.includes(2025)) rawYears.push(2025);
+
+            const years = rawYears.sort((a,b) => b-a);
             const select = document.getElementById('year-filter');
             select.innerHTML = '';
+            
             years.forEach(y => {
                 const opt = document.createElement('option');
-                opt.value = y; opt.innerText = y;
+                opt.value = y; 
+                opt.innerText = y;
+                if (y === 2025) opt.selected = true;
                 select.appendChild(opt);
             });
         }
@@ -221,7 +243,6 @@
             const year = Number(document.getElementById('year-filter').value);
             const filteredDaily = dailyData.filter(d => d['Season Year'] === year);
             const filteredWarns = warnData.filter(w => {
-                // Determine year from Start Date string or object
                 const dateStr = w['Start Date'];
                 const itemYear = new Date(dateStr).getFullYear();
                 return itemYear === year;
@@ -233,85 +254,159 @@
         }
 
         function renderStats(daily, warns) {
-            document.getElementById('stat-total-events').innerText = warns.length;
+            document.getElementById('stat-total-episodes').innerText = warns.length;
             document.getElementById('stat-red-count').innerText = warns.filter(w => w.Color === 'Red').length;
             const max = Math.max(...daily.map(d => d['Warning Hours'] || 0), 0);
-            document.getElementById('stat-max-hours').innerText = max.toFixed(1) + 'h';
+            document.getElementById('stat-max-hours').innerText = (max === -Infinity ? 0 : max).toFixed(1) + 'h';
             document.getElementById('stat-warn-days').innerText = daily.filter(d => d['Warning Hours'] > 0).length;
         }
 
         function renderHeatmap(data) {
             const el = document.getElementById('heatmap');
+            const labelEl = document.getElementById('month-labels-container');
             el.innerHTML = '';
-            data.forEach(d => {
-                const node = document.createElement('div');
-                node.className = 'day-node';
-                const h = d['Warning Hours'] || 0;
-                
-                if (h > 0) {
-                    if (d['Worst Color'] === 'Red') node.style.background = 'var(--red)';
-                    else if (h > 4) node.style.background = 'var(--amber)';
-                    else node.style.background = '#3e2c00';
-                }
+            labelEl.innerHTML = '';
+            
+            const yearSelection = Number(document.getElementById('year-filter').value) || 2025;
+            
+            if (data.length === 0) {
+                el.innerHTML = `<p class="text-xs text-gray-400 italic py-4">No activity recorded for ${yearSelection}.</p>`;
+                return;
+            }
 
-                node.onmouseenter = (e) => {
-                    const t = document.getElementById('chart-tooltip');
-                    t.style.display = 'block';
-                    t.style.left = (e.pageX + 10) + 'px';
-                    t.style.top = (e.pageY - 20) + 'px';
-                    t.innerHTML = `<strong>${d['Month Name']} ${d.Day}</strong><br>${h.toFixed(2)}h Warning`;
-                };
-                node.onmouseleave = () => document.getElementById('chart-tooltip').style.display = 'none';
-                el.appendChild(node);
+            const isLeapYear = (yearSelection % 4 === 0 && yearSelection % 100 !== 0) || (yearSelection % 400 === 0);
+            const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+            const dataMap = {};
+            data.forEach(d => {
+                if (d['Month Name'] && d['Day']) {
+                    dataMap[`${d['Month Name']}-${d['Day']}`] = d;
+                }
+            });
+
+            months.forEach((mName, mIdx) => {
+                const monthDiv = document.createElement('div');
+                monthDiv.innerText = mName;
+                const exactWidth = (daysInMonth[mIdx] / 7) * 18;
+                monthDiv.style.width = `${exactWidth}px`;
+                monthDiv.style.flexShrink = '0';
+                labelEl.appendChild(monthDiv);
+
+                for(let day = 1; day <= daysInMonth[mIdx]; day++) {
+                    const node = document.createElement('div');
+                    node.className = 'day-node';
+                    
+                    const d = dataMap[`${mName}-${day}`];
+                    let h = 0;
+                    let worstColor = '';
+
+                    if (d) {
+                        h = d['Warning Hours'] || 0;
+                        worstColor = d['Worst Color'] || '';
+                    }
+                    
+                    if (h > 0) {
+                        if (worstColor === 'Black') node.style.background = 'var(--black)';
+                        else if (worstColor === 'Red') node.style.background = 'var(--red)';
+                        else node.style.background = 'var(--amber)';
+                    } else {
+                        node.style.background = 'var(--empty)';
+                    }
+
+                    node.onmouseenter = (e) => {
+                        const t = document.getElementById('chart-tooltip');
+                        t.style.display = 'block';
+                        t.style.left = (e.pageX + 10) + 'px';
+                        t.style.top = (e.pageY - 20) + 'px';
+                        t.innerHTML = `<strong>${mName} ${day}, ${yearSelection}</strong><br>Severity: ${worstColor || 'Clear'}<br>Duration: ${h.toFixed(2)}h`;
+                    };
+                    node.onmouseleave = () => document.getElementById('chart-tooltip').style.display = 'none';
+                    el.appendChild(node);
+                }
             });
         }
 
         function renderCharts(daily, warns, year) {
             const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            const monthlyHours = months.map(m => {
-                return daily.filter(d => d['Month Name'] === m).reduce((sum, d) => sum + (d['Warning Hours'] || 0), 0);
+            
+            const allYears = [...new Set(dailyData.map(d => d['Season Year']))].filter(y => y).sort();
+            const palette = ['#2563eb', '#0d9488', '#7c3aed', '#0891b2', '#4f46e5', '#059669'];
+
+            const datasets = allYears.map((y, idx) => {
+                const monthlyValues = months.map(m => {
+                    return dailyData
+                        .filter(d => d['Season Year'] === y && d['Month Name'] === m)
+                        .reduce((sum, d) => sum + (d['Warning Hours'] || 0), 0);
+                });
+
+                const color = palette[idx % palette.length];
+                return {
+                    label: `${y}`,
+                    data: monthlyValues,
+                    borderColor: color,
+                    backgroundColor: color + '15',
+                    fill: true,
+                    tension: 0, 
+                    pointRadius: 3,
+                    hidden: y !== year
+                };
             });
 
-            // Line Chart
             const ctx1 = document.getElementById('lineChart').getContext('2d');
             if (charts.line) charts.line.destroy();
             charts.line = new Chart(ctx1, {
                 type: 'line',
                 data: {
                     labels: months,
-                    datasets: [{
-                        label: 'Warning Hours',
-                        data: monthlyHours,
-                        borderColor: '#d29922',
-                        backgroundColor: '#d2992220',
-                        fill: true,
-                        tension: 0.4
-                    }]
+                    datasets: datasets
                 },
                 options: { 
                     maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
                     plugins: { 
-                        legend: { display: false },
-                        title: { display: true, text: `Monthly Accumulation (${year})`, color: '#fff' }
+                        legend: { 
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                boxWidth: 12,
+                                usePointStyle: true,
+                                font: { size: 10 }
+                            }
+                        },
+                        title: { 
+                            display: true, 
+                            text: `Total Warning Hours (Toggle years in legend)`, 
+                            color: '#24292e', 
+                            font: { weight: 'bold' } 
+                        }
                     },
                     scales: {
-                        y: { grid: { color: '#ffffff10' }, ticks: { color: '#8b949e' } },
-                        x: { grid: { display: false }, ticks: { color: '#8b949e' } }
+                        y: { 
+                            beginAtZero: true,
+                            grid: { color: '#f0f0f0' }, 
+                            ticks: { color: '#6a737d' },
+                            title: { display: false }
+                        },
+                        x: { grid: { display: false }, ticks: { color: '#6a737d' } }
                     }
                 }
             });
 
-            // Bar Chart (Distribution)
             const ctx2 = document.getElementById('barChart').getContext('2d');
             if (charts.bar) charts.bar.destroy();
-            const ranges = ['0-2h', '2-4h', '4-6h', '6h+'];
-            const histData = [0, 0, 0, 0];
+            const ranges = ['0-2h', '2-4h', '4-6h', '6-8h', '8h+'];
+            const histData = [0, 0, 0, 0, 0];
             warns.forEach(w => {
                 const dur = w['Duration (hours)'];
                 if (dur <= 2) histData[0]++;
                 else if (dur <= 4) histData[1]++;
                 else if (dur <= 6) histData[2]++;
-                else histData[3]++;
+                else if (dur <= 8) histData[3]++;
+                else histData[4]++;
             });
 
             charts.bar = new Chart(ctx2, {
@@ -320,8 +415,8 @@
                     labels: ranges,
                     datasets: [{
                         data: histData,
-                        backgroundColor: '#f8514980',
-                        borderColor: '#f85149',
+                        backgroundColor: '#2563eb80',
+                        borderColor: '#2563eb',
                         borderWidth: 1
                     }]
                 },
@@ -329,17 +424,16 @@
                     maintainAspectRatio: false,
                     plugins: { 
                         legend: { display: false },
-                        title: { display: true, text: 'Warning Duration Frequency', color: '#fff' }
+                        title: { display: true, text: `Warning Duration Frequency (${year})`, color: '#24292e', font: { weight: 'bold' } }
                     },
                     scales: {
-                        y: { grid: { color: '#ffffff10' }, ticks: { color: '#8b949e', stepSize: 1 } },
-                        x: { grid: { display: false }, ticks: { color: '#8b949e' } }
+                        y: { grid: { color: '#f0f0f0' }, ticks: { color: '#6a737d', stepSize: 1 } },
+                        x: { grid: { display: false }, ticks: { color: '#6a737d' } }
                     }
                 }
             });
         }
 
-        // Start the engine
         window.onload = initSync;
     </script>
 </body>
