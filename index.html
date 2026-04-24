@@ -32,6 +32,7 @@
             border-radius: 12px;
             padding: 1.5rem;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            height: 100%;
         }
 
         .heatmap-container {
@@ -106,7 +107,7 @@
             <div>
                 <h1 class="text-3xl font-black text-gray-900 flex items-center gap-3">
                     Heat Stress Analytics
-                    <span id="sync-indicator" class="px-2 py-0.5 bg-blue-100 text-blue-700 border border-blue-200 text-[10px] rounded font-black uppercase whitespace-nowrap">Nightly Updated at 23:30 HKT</span>
+                    <span id="sync-indicator" class="hidden px-2 py-0.5 bg-blue-100 text-blue-700 border border-blue-200 text-[10px] rounded font-black uppercase whitespace-nowrap">Nightly Updated at 23:30 HKT</span>
                 </h1>
                 <p class="text-gray-500 text-sm font-medium">Automated monitoring via Google Sheets API</p>
             </div>
@@ -117,22 +118,31 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="card border-amber-200 bg-amber-50/50">
-                <p class="text-[10px] text-amber-700 uppercase font-black tracking-widest mb-1">Warning Episodes</p>
-                <p id="stat-total-episodes" class="text-4xl font-black text-amber-600">—</p>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
+            <div class="card border-amber-200 bg-amber-50/50 flex flex-col justify-between">
+                <div>
+                    <p class="text-[10px] text-amber-700 uppercase font-black tracking-widest mb-1">Warning Episodes</p>
+                    <p id="stat-total-episodes" class="text-4xl font-black text-amber-600">—</p>
+                </div>
             </div>
-            <div class="card bg-gray-50/30">
-                <p class="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Warning Days</p>
-                <p id="stat-warn-days" class="text-4xl font-black text-gray-900">—</p>
+            <div class="card bg-gray-50/30 flex flex-col justify-between">
+                <div>
+                    <p class="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Warning Days</p>
+                    <p id="stat-warn-days" class="text-4xl font-black text-gray-900">—</p>
+                </div>
             </div>
-            <div class="card border-red-200 bg-red-50/50">
-                <p class="text-[10px] text-red-700 uppercase font-black tracking-widest mb-1">Red Alerts</p>
-                <p id="stat-red-count" class="text-4xl font-black text-red-600">—</p>
+            <div class="card border-red-200 bg-red-50/50 flex flex-col justify-between">
+                <div>
+                    <p class="text-[10px] text-red-700 uppercase font-black tracking-widest mb-1">Red Alerts</p>
+                    <p id="stat-red-count" class="text-4xl font-black text-red-600">—</p>
+                </div>
             </div>
-            <div class="card bg-gray-50/30">
-                <p class="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Max Duration (hrs)</p>
-                <p id="stat-max-hours" class="text-4xl font-black text-gray-900">—</p>
+            <div class="card bg-gray-50/30 flex flex-col justify-between">
+                <div>
+                    <p class="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Max Duration</p>
+                    <p id="stat-max-hours" class="text-4xl font-black text-gray-900">—</p>
+                </div>
+                <p id="stat-max-date" class="text-xs text-gray-500 font-medium mt-1 truncate">—</p>
             </div>
         </div>
 
@@ -256,9 +266,36 @@
         function renderStats(daily, warns) {
             document.getElementById('stat-total-episodes').innerText = warns.length;
             document.getElementById('stat-red-count').innerText = warns.filter(w => w.Color === 'Red').length;
-            const max = Math.max(...daily.map(d => d['Warning Hours'] || 0), 0);
-            document.getElementById('stat-max-hours').innerText = (max === -Infinity ? 0 : max).toFixed(1) + 'h';
             document.getElementById('stat-warn-days').innerText = daily.filter(d => d['Warning Hours'] > 0).length;
+
+            // 1. Find the maximum duration value for the filtered period
+            const maxDurationValue = Math.max(...daily.map(d => d['Warning Hours'] || 0), 0);
+
+            // 2. Collect all days that hit this maximum duration
+            const peakDays = daily.filter(d => (d['Warning Hours'] || 0) === maxDurationValue && maxDurationValue > 0);
+
+            // Update UI
+            if (peakDays.length > 0) {
+                document.getElementById('stat-max-hours').innerText = maxDurationValue.toFixed(1) + 'h';
+                
+                // Format the string for multiple dates if necessary
+                const dateStrings = peakDays.map(d => `${d['Month Name']} ${d['Day']}`);
+                
+                let displayText = "";
+                if (dateStrings.length === 1) {
+                    displayText = `on ${dateStrings[0]}, ${peakDays[0]['Season Year']}`;
+                } else if (dateStrings.length <= 3) {
+                    displayText = `on ${dateStrings.join(', ')}`;
+                } else {
+                    displayText = `on ${dateStrings.slice(0, 2).join(', ')} & ${dateStrings.length - 2} more`;
+                }
+
+                document.getElementById('stat-max-date').innerText = displayText;
+                document.getElementById('stat-max-date').classList.remove('hidden');
+            } else {
+                document.getElementById('stat-max-hours').innerText = "—";
+                document.getElementById('stat-max-date').innerText = "No warning days";
+            }
         }
 
         function renderHeatmap(data) {
